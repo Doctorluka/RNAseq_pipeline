@@ -65,7 +65,7 @@ filter_counts <- exp %>%
   dplyr::select(-rowmean) %>% # 去除rowmeans列
   na.omit() # 去除NA值
 dim(filter_counts)
-# [1] 17625     7    # 最终应获得约16000-18000左右的基因比较常见
+# [1] 17625     7    # 最终应获得约16000-19000左右的基因比较常见
 
 filter_counts[1:4,1:4] #最后矩阵长这样
 #   gene_name A71_count A72_count A73_count
@@ -109,12 +109,12 @@ vsd <- vst(dds, blind = FALSE)
 ### 内置函数plotPCA进行主成分分析画图，可以用ggplot2语法修改
 plotPCA(vsd, "group")
 
-### 用内置函数plotCounts来进行快速，简易作图
+### 用内置函数plotCounts来进行快速，简易作图，如果你的是做的siRNA干扰，这一步对你很有帮助
 ### 找到阳性基因,此处ESR1
 ### dds来自于上一步
 ### gene 输入的是ensemble ID
 ### intgroup 输入的是metadata中分组信息
-plotCounts(dds, gene = "Piezo1", intgroup=c("group"))
+plotCounts(dds, gene = "ESR1", intgroup=c("group"))
 
 ### 导出标准化后的表达数据
 ### assay函数提取vst标准化后的数据，保存数据用于热图
@@ -130,8 +130,8 @@ dds <- DESeq(dds)
 
 ### 6.logFC矫正，RNAseq很重要的一步
 ### contrast参数设置
-### 依次是，1.分组信息(metadata中的列) 2.处理组，3.对照组
-contrast=c("group", "MCT", "Ctrl")
+### 依次是，1.分组信息(group中的分组列) 2.处理组，3.对照组
+contrast=c("group", "treat", "Ctrl")
 
 ### results函数获取差异分析的结果
 dd1 <- results(dds, contrast=contrast, alpha = 0.05)
@@ -141,7 +141,7 @@ plotMA(dd1, ylim=c(-5,5))
 
 ### logFC矫正
 dd2 <- lfcShrink(dds,contrast=contrast, res=dd1,type="ashr")
-plotMA(dd2, ylim=c(-5,5))
+plotMA(dd2, ylim=c(-5,5)) #跟矫正前做一个对比
 
 
 ### 7.导出差异分析的结果
@@ -161,10 +161,10 @@ res <- res %>% inner_join(entrez, ., by =c("SYMBOL" = "gene_id"))
 dim(res)
 
 ### 修改logFC，p值的名称，为的是跟火山图的代码匹配
-colnames(res) <- c("gene_id","entrez","baseMean","logFC","lfcSE","P.Value","adj.P.Val")
+colnames(res) <- c("symbol","entrez","baseMean","logFC","lfcSE","P.Value","adj.P.Val")
 
 head(res)
-#   gene_id entrez baseMean       logFC      lfcSE      P.Value    adj.P.Val
+#    symbol entrez baseMean       logFC      lfcSE      P.Value    adj.P.Val
 # 1    Lyz2  25211 566390.1  0.01583649 0.06252924 6.078288e-01 0.8905920100
 # 2   Sftpc  50683 322508.1 -0.01971806 0.06582212 5.395627e-01 0.8589446657
 # 3  Sftpa1  24773 168197.6  0.15176507 0.11144402 1.656068e-02 0.1414188917
@@ -182,7 +182,7 @@ save(res,file = "data/2.res.Rdata")
 # 重要前提！！
 # 必须走完一遍上面的流程，熟悉各个数据的格式，熟悉之后可以按下面流程走
 
-# 首先按照自建函数方法保存 my_DESeq2.R 文件到scripts文件夹
+# 首先保存 my_DESeq2.R 文件到scripts文件夹,代码也在RNAseq_pipeline中
 source("scripts/my_DESeq2.R")
 
 # 不要运行，这是示例的默认参数
@@ -220,7 +220,7 @@ exprSet_vst <- read.csv("results/3.exprset_vst.csv", row.names = 1)
 
 
 #########################################################
-################# step3.3: 结合批次效应 ##################
+################ step3.3: 去除批次效应+差异分析 ###########
 #########################################################
 rm(list = ls)
 options(stringsAsFactors = F)
@@ -243,7 +243,7 @@ dim(filter_counts)
 filter_counts[1:4,1:4]
 
 # 确认group与filter_counts样本名对应
-# 并且添加一列 batch 以数字来代表同一批次来源的样本(按自己的数据特征)
+# 并且添加一列 batch 以数字来代表同一批次来源的样本(按自己的数据特征)，这里仅供格式参考
 group
 #       sample   group batch
 # 1     SuHx_1    SuHx     1
@@ -273,11 +273,11 @@ assay(vsd) <- mat
 counts_batch_corrected <- assay(vsd)
 boxplot(counts_batch_corrected) #观察样本间boxplot是否相近
 
-write.csv(counts_batch_corrected,"result/2.Suhx_vs_suhx_RP_exprSet_vst.csv") 
+write.csv(counts_batch_corrected,"result/2.exprSet_vst.csv") 
 
 # 接下来的分析就跟上面是一样的
 ### 依次是，1.分组信息(metadata中的列) 2.处理组，3.对照组
-contrast=c("group", "SuHx+RP", "SuHx")
+contrast=c("group", "SuHx+RP", "SuHx") #跟前面分组信息对应
 dd1 <- results(dds, contrast=contrast, alpha = 0.05)
 
 ### 内置函数plotMA作图
