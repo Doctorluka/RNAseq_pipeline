@@ -84,8 +84,11 @@ group #查看样品名与group是否对应
 # 6 I99_count treat
 
 #########################################################
-###################### step3: DESeq2 ####################
+###################### step3.1: DESeq2 ####################
 #########################################################
+
+# 如果你的表达矩阵是多批次合并的
+# 请按照 step3.3来运行
 
 library(DESeq2)
 dds <-DESeqDataSetFromMatrix(countData=filter_counts, 
@@ -174,7 +177,7 @@ save(res,file = "data/2.res.Rdata")
 
 
 #########################################################
-################# step3: DESeq2偷懒法 ####################
+################# step3.2: DESeq2偷懒法 ####################
 #########################################################
 # 重要前提！！
 # 必须走完一遍上面的流程，熟悉各个数据的格式，熟悉之后可以按下面流程走
@@ -216,6 +219,85 @@ load("results/3.DESeq2.Rdata")
 exprSet_vst <- read.csv("results/3.exprset_vst.csv", row.names = 1)
 
 
+#########################################################
+################# step3.3: 结合批次效应 ##################
+#########################################################
+rm(list = ls)
+options(stringsAsFactors = F)
+gc()
+
+library(tidyr)
+library(dplyr)
+library(tibble)
+library(stringr)
+
+load("data/1.rawcount_group.Rdata")
+
+filter_counts <- exp %>% 
+  mutate(rowmeans = rowMeans(.[2:ncol(.)])) %>% 
+  arrange(desc(rowmeans)) %>% 
+  distinct(Name, .keep_all = T) %>% 
+  dplyr::filter(rowmeans > 1) %>% 
+  dplyr::select(-rowmeans)
+dim(filter_counts)
+filter_counts[1:4,1:4]
+
+# 确认group与filter_counts样本名对应
+# 并且添加一列 batch 以数字来代表同一批次来源的样本(按自己的数据特征)
+group
+#       sample   group batch
+# 1     SuHx_1    SuHx     1
+# 2     SuHx_2    SuHx     1
+# 3     SuHx_3    SuHx     1
+# 4     SuHx_4    SuHx     2
+# 5     SuHx_5    SuHx     2
+# 6     SuHx_6    SuHx     2
+# 7  SuHx+RP_1 SuHx+RP     1
+# 8  SuHx+RP_2 SuHx+RP     1
+# 9  SuHx+RP_3 SuHx+RP     1
+# 10 SuHx+RP_4 SuHx+RP     2
+# 11 SuHx+RP_5 SuHx+RP     2
+# 12 SuHx+RP_6 SuHx+RP     2
+
+library(DESeq2)
+library(limma)
+dds <-DESeqDataSetFromMatrix(countData=filter_counts, 
+                             colData=group, 
+                             design= ~ batch +group, #加上batch
+                             tidy=TRUE) #TRUE是指filter_counts第一列是基因名，如果基因名在行名上应该选FALSE
+dds <- DESeq(dds)
+vsd <- vst(dds, blind=FALSE)
+mat <- assay(vsd)
+mat <- limma::removeBatchEffect(mat, vsd$batch) #去除batch
+assay(vsd) <- mat
+counts_batch_corrected <- assay(vsd)
+boxplot(counts_batch_corrected) #观察样本间boxplot是否相近
+
+write.csv(counts_batch_corrected,"result/2.Suhx_vs_suhx_RP_exprSet_vst.csv") 
+
+# 接下来的分析就跟上面是一样的
+### 依次是，1.分组信息(metadata中的列) 2.处理组，3.对照组
+contrast=c("group", "SuHx+RP", "SuHx")
+dd1 <- results(dds, contrast=contrast, alpha = 0.05)
+
+### 内置函数plotMA作图
+plotMA(dd1, ylim=c(-5,5))
+
+### logFC矫正
+dd2 <- lfcShrink(dds,contrast=contrast, res=dd1,type="ashr")
+plotMA(dd2, ylim=c(-5,5))
+
+### 7.导出差异分析的结果
+res <- dd2 %>% 
+  as.data.frame() %>% 
+  rownames_to_column("gene_id")
+
+colnames(res) <- c("symbol","baseMean","logFC","lfcSE","P.Value","adj.P.Val")
+rownames(res) <- res$symbol
+head(res)
+
+# 保存
+write.csv(res, file = "result/3.suhx_DESeq2_res.csv")
 
 #########################################################
 ################# step4: volcano plot ###################
