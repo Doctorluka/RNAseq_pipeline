@@ -1,4 +1,8 @@
 # RNAseq_pipeline
-code for bulk RNA-seq analysis including DESeq2, volcano plot, heatmap and GSEA
+Code for bulk RNA-seq analysis including DESeq2, volcano plot, heatmap and GSEA
 
-all code is saving in file pipeline.R
+All code is saved in file pipeline.R
+
+If you have any question or find any mistake in the pipeline, please let me know it: doctorfhz@163.com
+
+Thanks!
