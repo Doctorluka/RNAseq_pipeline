@@ -5,6 +5,8 @@ All code is saved in file pipeline.R
 
 The file start with "function" is the self-defining function for plots. You are welcome to use them for your own research and papers, but commercial distribution is prohibited. 
 
+The current comments are all based on Chinese, and will be changed to English sometime. Please forgive me. 
+
 If you have any question or find any mistake in the pipeline, please let me know it: doctorfhz@163.com
 
 Thanks!
